@@ -1,0 +1,22 @@
+[
+  { "id": 1, "nombre": "Arroz Roa (1 Lb)", "precio": 2400 },
+  { "id": 2, "nombre": "Aceite Premier (1.000 ml)", "precio": 12800 },
+  { "id": 3, "nombre": "Leche Alquería (1 Litro)", "precio": 4900 },
+  { "id": 4, "nombre": "Huevos AAA (Cubeta x 30)", "precio": 16500 },
+  { "id": 5, "nombre": "Pan Tajado Bimbo Grande", "precio": 9200 },
+  { "id": 6, "nombre": "Café Sello Rojo (250g)", "precio": 6800 },
+  { "id": 7, "nombre": "Chocolate Sol (500g)", "precio": 7200 },
+  { "id": 8, "nombre": "Azúcar Manuelita (1 Kilo)", "precio": 4500 },
+  { "id": 9, "nombre": "Sal Refisal (1 Kilo)", "precio": 2100 },
+  { "id": 10, "nombre": "Harina de Maíz Promasa", "precio": 4800 },
+  { "id": 11, "nombre": "Frijol Bola Roja Doria", "precio": 7900 },
+  { "id": 12, "nombre": "Pasta Doria Espagueti", "precio": 4100 },
+  { "id": 13, "nombre": "Atún Van Camp's (160g)", "precio": 8500 },
+  { "id": 14, "nombre": "Queso Campesino Alpina", "precio": 14200 },
+  { "id": 15, "nombre": "Mantequilla Rama (250g)", "precio": 5400 },
+  { "id": 16, "nombre": "Coca-Cola (1.5 Litros)", "precio": 5200 },
+  { "id": 17, "nombre": "Papas Margarita Pollo", "precio": 4900 },
+  { "id": 18, "nombre": "Jabón Rey (Barra 300g)", "precio": 3200 },
+  { "id": 19, "nombre": "Detergente Fab (900g)", "precio": 10500 },
+  { "id": 20, "nombre": "Papel Higiénico Familia", "precio": 6400 }
+]
