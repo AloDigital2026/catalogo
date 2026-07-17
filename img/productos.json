@@ -1,0 +1,8 @@
+[
+  { "id": 1, "nombre": "Leche Alquería (1 Litro)", "precio": 4900, "img": "prod_01.jpg" },
+  { "id": 2, "nombre": "Pan Tajado Bimbo Grande", "precio": 9200, "img": "prod_02.jpg" },
+  { "id": 3, "nombre": "Chocolates (o nombre real)", "precio": 0, "img": "prod_03.jpg" },
+  { "id": 4, "nombre": "Azúcar Manuelita", "precio": 0, "img": "prod_04.jpg" },
+  { "id": 5, "nombre": "Café Sello Rojo", "precio": 6800, "img": "prod_05.jpg" },
+  { "id": 6, "nombre": "Aceite Premier", "precio": 12800, "img": "prod_06.jpg" }
+]
