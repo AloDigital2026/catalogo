@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda Don Arturo - Catálogo Premium</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="header">
+        <h1>Tienda Don Arturo - <span>Catálogo Premium</span></h1>
+    </header>
+
+    <main class="catalogo" id="grid"></main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="total-box">
+                Subtotal Estimado
+                <span id="total">COP $0</span>
+            </div>
+            <button class="btn-finalizar" id="btn-finalizar">Finalizar Pedido</button>
+        </div>
+    </footer>
+
+    <script>
+        const grid = document.getElementById('grid');
+        const totalTXT = document.getElementById('total');
+        const btnFinalizar = document.getElementById('btn-finalizar');
+        
+        let totalAcumulado = 0;
+        let productosSeleccionados = [];
+
+        // Función encargada de dibujar los productos
+        function mostrarProductos(lista) {
+            grid.innerHTML = '';
+            lista.forEach(prod => {
+                const card = document.createElement('div');
+                card.className = 'producto';
+                
+                // Estructura actualizada: incluye la etiqueta <img> dentro del contenedor
+                card.innerHTML = `
+                    <div class="indicador"></div>
+                    <div class="img-placeholder">
+                        <img src="img/${prod.img}" alt="${prod.nombre}" class="img-producto">
+                    </div>
+                    <h3>${prod.nombre}</h3>
+                    <div class="precio">COP $${prod.precio.toLocaleString('es-CO')}</div>
+                `;
+
+                // Qué pasa cuando se hace clic en una tarjeta:
+                card.onclick = function() {
+                    card.classList.toggle('seleccionado');
+                    
+                    if (card.classList.contains('seleccionado')) {
+                        totalAcumulado += prod.precio;
+                        productosSeleccionados.push(prod);
+                    } else {
+                        totalAcumulado -= prod.precio;
+                        productosSeleccionados = productosSeleccionados.filter(item => item.id !== prod.id);
+                    }
+                    
+                    totalTXT.innerText = `COP $${totalAcumulado.toLocaleString('es-CO')}`;
+                };
+
+                grid.appendChild(card);
+            });
+        }
+
+        fetch('productos.json')
+            .then(response => response.json())
+            .then(data => mostrarProductos(data))
+            .catch(error => {
+                const respaldoFijo = [
+                  { "id": 1, "nombre": "Arroz Roa (1 Lb)", "precio": 2400, "img": "prod_01.jpg" },
+                  { "id": 2, "nombre": "Aceite Premier (1.000 ml)", "precio": 12800, "img": "prod_02.jpg" },
+                  { "id": 3, "nombre": "Leche Alquería (1 Litro)", "precio": 4900, "img": "prod_03.jpg" },
+                  { "id": 4, "nombre": "Huevos AAA (Cubeta x 30)", "precio": 16500, "img": "prod_04.jpg" },
+                  { "id": 5, "nombre": "Pan Tajado Bimbo Grande", "precio": 9200, "img": "prod_05.jpg" },
+                  { "id": 6, "nombre": "Café Sello Rojo (250g)", "precio": 6800, "img": "prod_06.jpg" }
+                ];
+                mostrarProductos(respaldoFijo);
+            });
+
+        btnFinalizar.onclick = function() {
+            if (productosSeleccionados.length === 0) {
+                alert("Por favor, seleccione al menos un producto para su pedido.");
+                return;
+            }
+            alert(`¡Éxito! Pedido procesado para ${productosSeleccionados.length} artículos.\nTotal acumulado: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
+        };
+    </script>
+</body>
+</html>
