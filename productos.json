@@ -1,8 +1,0 @@
-[
-  { "id": 1, "nombre": "Arroz Roa (1 Lb)", "precio": 2400, "img": "prod_01.jpg" },
-  { "id": 2, "nombre": "Aceite Premier (1.000 ml)", "precio": 12800, "img": "prod_02.jpg" },
-  { "id": 3, "nombre": "Leche Alquería (1 Litro)", "precio": 4900, "img": "prod_03.jpg" },
-  { "id": 4, "nombre": "Huevos AAA (Cubeta x 30)", "precio": 16500, "img": "prod_04.jpg" },
-  { "id": 5, "nombre": "Pan Tajado Bimbo Grande", "precio": 9200, "img": "prod_05.jpg" },
-  { "id": 6, "nombre": "Café Sello Rojo (250g)", "precio": 6800, "img": "prod_06.jpg" }
-]
