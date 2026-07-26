@@ -99,24 +99,22 @@
 
             const nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
 
-            const datosPedido = {
+            // Armamos la URL con los datos del pedido como parámetros (GET, no POST)
+            const params = new URLSearchParams({
+                accion: 'crearPedido',
                 fecha: new Date().toLocaleString(),
                 direccion: direccion,
                 pedido: nombresPedido,
-                origen: "Web Catálogo",
-                pago: "Pendiente",
-                notas: "",
-                estado: "Recibido"
-            };
+                origen: 'Web Catálogo',
+                pago: 'Pendiente',
+                notas: '',
+                estado: 'Recibido'
+            });
 
             btnFinalizar.disabled = true;
             btnFinalizar.innerText = "Enviando...";
 
-            fetch(URL_BACKEND, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(datosPedido)
-            })
+            fetch(URL_BACKEND + '?' + params.toString())
             .then(response => response.json())
             .then(data => {
                 if (data.status === "success") {
