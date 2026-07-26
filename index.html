@@ -28,7 +28,9 @@
         const grid = document.getElementById('grid');
         const totalTXT = document.getElementById('total');
         const btnFinalizar = document.getElementById('btn-finalizar');
-        
+
+        const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbzDPoeuLQOOKbS_3eblLFcuRUmYr1Wsxjq5pM2tQKUbSNXOCraqe4QrGKp-8q0MZkzmqw/exec';
+
         let totalAcumulado = 0;
         let productosSeleccionados = [];
 
@@ -37,7 +39,7 @@
             lista.forEach(prod => {
                 const card = document.createElement('div');
                 card.className = 'producto';
-                
+
                 card.innerHTML = `
                     <div class="indicador"></div>
                     <div class="img-placeholder">
@@ -49,7 +51,7 @@
 
                 card.onclick = function() {
                     card.classList.toggle('seleccionado');
-                    
+
                     if (card.classList.contains('seleccionado')) {
                         totalAcumulado += prod.precio;
                         productosSeleccionados.push(prod);
@@ -57,7 +59,7 @@
                         totalAcumulado -= prod.precio;
                         productosSeleccionados = productosSeleccionados.filter(item => item.id !== prod.id);
                     }
-                    
+
                     totalTXT.innerText = `COP $${totalAcumulado.toLocaleString('es-CO')}`;
                 };
 
@@ -67,18 +69,11 @@
 
         fetch('productos.json')
             .then(response => {
-                if (!response.ok) {
-                    console.log("Estado de la respuesta:", response.status);
-                    throw new Error('Error al cargar JSON');
-                }
+                if (!response.ok) throw new Error('Error al cargar JSON');
                 return response.json();
             })
-            .then(data => {
-                console.log("ÉXITO: Datos cargados desde el archivo JSON");
-                mostrarProductos(data);
-            })
+            .then(data => mostrarProductos(data))
             .catch(error => {
-                console.warn("FALLO: La aplicación está usando el respaldo fijo (fallback).");
                 const respaldoFijo = [
                     { "id": 1, "nombre": "Leche Alquería (1 Litro)", "precio": 4900, "img": "prod_01.jpg" },
                     { "id": 2, "nombre": "Pan Tajado Bimbo Grande", "precio": 9200, "img": "prod_02.jpg" },
@@ -95,7 +90,52 @@
                 alert("Por favor, seleccione al menos un producto para su pedido.");
                 return;
             }
-            alert(`¡Éxito! Pedido procesado para ${productosSeleccionados.length} artículos.\nTotal acumulado: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
+
+            const direccion = prompt("Ingrese la dirección de entrega:");
+            if (!direccion) {
+                alert("Debe ingresar una dirección para continuar.");
+                return;
+            }
+
+            const nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
+
+            const datosPedido = {
+                fecha: new Date().toLocaleString(),
+                direccion: direccion,
+                pedido: nombresPedido,
+                origen: "Web Catálogo",
+                pago: "Pendiente",
+                notas: "",
+                estado: "Recibido"
+            };
+
+            btnFinalizar.disabled = true;
+            btnFinalizar.innerText = "Enviando...";
+
+            fetch(URL_BACKEND, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(datosPedido)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    alert(`¡Pedido #${data.id} registrado correctamente!\nTotal: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
+                    productosSeleccionados = [];
+                    totalAcumulado = 0;
+                    totalTXT.innerText = `COP $0`;
+                    document.querySelectorAll('.producto.seleccionado').forEach(el => el.classList.remove('seleccionado'));
+                } else {
+                    alert("Error al registrar el pedido: " + data.message);
+                }
+            })
+            .catch(error => {
+                alert("No se pudo conectar con el servidor. Intente nuevamente.");
+            })
+            .finally(() => {
+                btnFinalizar.disabled = false;
+                btnFinalizar.innerText = "Finalizar Pedido";
+            });
         };
     </script>
 </body>
