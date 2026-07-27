@@ -97,6 +97,8 @@
                 return;
             }
 
+            const observaciones = prompt("Observaciones (opcional): ej. sin bolsa, tocar el timbre, cambiar marca...") || "";
+
             const nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
 
             // Armamos la URL con los datos del pedido como parámetros (GET, no POST)
@@ -107,7 +109,7 @@
                 pedido: nombresPedido,
                 origen: 'Web Catálogo',
                 pago: 'Pendiente',
-                notas: '',
+                notas: observaciones,
                 estado: 'Recibido'
             });
 
@@ -138,3 +140,4 @@
     </script>
 </body>
 </html>
+
