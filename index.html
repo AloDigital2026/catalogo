@@ -99,6 +99,11 @@
 
             const observaciones = prompt("Observaciones (opcional): ej. sin bolsa, tocar el timbre, cambiar marca...") || "";
 
+            let formaPago = prompt("¿Cómo desea pagar? Escriba: Efectivo, Nequi, Daviplata o Tarjeta");
+            if (!formaPago) {
+                formaPago = "No especificado";
+            }
+
             const nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
 
             // Armamos la URL con los datos del pedido como parámetros (GET, no POST)
@@ -107,8 +112,9 @@
                 fecha: new Date().toLocaleString(),
                 direccion: direccion,
                 pedido: nombresPedido,
+                total: totalAcumulado,
                 origen: 'Web Catálogo',
-                pago: 'Pendiente',
+                pago: formaPago,
                 notas: observaciones,
                 estado: 'Recibido'
             });
