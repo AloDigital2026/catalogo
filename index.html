@@ -20,6 +20,7 @@
                 Subtotal Estimado
                 <span id="total">COP $0</span>
             </div>
+            <button class="btn-finalizar" id="btn-voz" style="margin-right: 10px; background: #333;">🎤 Pedir por voz</button>
             <button class="btn-finalizar" id="btn-finalizar">Finalizar Pedido</button>
         </div>
     </footer>
@@ -85,9 +86,67 @@
                 mostrarProductos(respaldoFijo);
             });
 
+        const btnVoz = document.getElementById('btn-voz');
+
+        btnVoz.onclick = function() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Lo sentimos, su navegador no soporta pedidos por voz. Use Chrome en Android o computador.");
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'es-CO';
+            recognition.interimResults = false;
+
+            btnVoz.disabled = true;
+            btnVoz.innerText = "🎤 Escuchando...";
+
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                const textoHablado = event.results[0][0].transcript;
+                btnVoz.innerText = "🎤 Procesando...";
+
+                fetch(URL_BACKEND + '?accion=interpretarVoz&texto=' + encodeURIComponent(textoHablado))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        const confirmado = confirm(
+                            `Escuché: "${textoHablado}"\n\nEntendí que su pedido es:\n${data.pedido}\n\n¿Es correcto? Presione Aceptar para agregarlo, o Cancelar para intentar de nuevo.`
+                        );
+                        if (confirmado) {
+                            alert(`Perfecto, agregado a su pedido: ${data.pedido}\n\nAhora seleccione también los productos en el catálogo si desea agregar algo más, y presione "Finalizar Pedido".`);
+                            // Guardamos el pedido de voz para incluirlo al finalizar
+                            window.pedidoDeVoz = data.pedido;
+                        }
+                    } else {
+                        alert(data.message || "No se pudo entender el pedido. Intente de nuevo.");
+                    }
+                })
+                .catch(error => {
+                    alert("No se pudo conectar con el servidor para interpretar la voz.");
+                })
+                .finally(() => {
+                    btnVoz.disabled = false;
+                    btnVoz.innerText = "🎤 Pedir por voz";
+                });
+            };
+
+            recognition.onerror = function(event) {
+                alert("No se pudo escuchar correctamente. Intente de nuevo.");
+                btnVoz.disabled = false;
+                btnVoz.innerText = "🎤 Pedir por voz";
+            };
+
+            recognition.onspeechend = function() {
+                recognition.stop();
+            };
+        };
+
         btnFinalizar.onclick = function() {
-            if (productosSeleccionados.length === 0) {
-                alert("Por favor, seleccione al menos un producto para su pedido.");
+            if (productosSeleccionados.length === 0 && !window.pedidoDeVoz) {
+                alert("Por favor, seleccione al menos un producto o haga su pedido por voz.");
                 return;
             }
 
@@ -104,7 +163,10 @@
                 formaPago = "No especificado";
             }
 
-            const nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
+            let nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
+            if (window.pedidoDeVoz) {
+                nombresPedido = nombresPedido ? (nombresPedido + ", " + window.pedidoDeVoz) : window.pedidoDeVoz;
+            }
 
             // Armamos la URL con los datos del pedido como parámetros (GET, no POST)
             const params = new URLSearchParams({
@@ -129,6 +191,7 @@
                     alert(`¡Pedido #${data.id} registrado correctamente!\nTotal: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
                     productosSeleccionados = [];
                     totalAcumulado = 0;
+                    window.pedidoDeVoz = null;
                     totalTXT.innerText = `COP $0`;
                     document.querySelectorAll('.producto.seleccionado').forEach(el => el.classList.remove('seleccionado'));
                 } else {
