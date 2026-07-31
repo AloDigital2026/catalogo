@@ -29,11 +29,13 @@
         const grid = document.getElementById('grid');
         const totalTXT = document.getElementById('total');
         const btnFinalizar = document.getElementById('btn-finalizar');
+        const btnVoz = document.getElementById('btn-voz');
 
         const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbzDPoeuLQOOKbS_3eblLFcuRUmYr1Wsxjq5pM2tQKUbSNXOCraqe4QrGKp-8q0MZkzmqw/exec';
 
         let totalAcumulado = 0;
         let productosSeleccionados = [];
+        let conversacionArturo = [];
 
         function mostrarProductos(lista) {
             grid.innerHTML = '';
@@ -86,12 +88,17 @@
                 mostrarProductos(respaldoFijo);
             });
 
-        const btnVoz = document.getElementById('btn-voz');
+        function hablar(texto) {
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'es-CO';
+            utterance.rate = 1;
+            speechSynthesis.speak(utterance);
+        }
 
-        btnVoz.onclick = function() {
+        function iniciarTurnoConversacion() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                alert("Lo sentimos, su navegador no soporta pedidos por voz. Use Chrome en Android o computador.");
+                alert("Su navegador no soporta pedidos por voz. Use Chrome en Android o computador.");
                 return;
             }
 
@@ -101,39 +108,53 @@
 
             btnVoz.disabled = true;
             btnVoz.innerText = "🎤 Escuchando...";
-
             recognition.start();
 
             recognition.onresult = function(event) {
                 const textoHablado = event.results[0][0].transcript;
-                btnVoz.innerText = "🎤 Procesando...";
+                btnVoz.innerText = "🎤 Arturo está pensando...";
 
-                fetch(URL_BACKEND + '?accion=interpretarVoz&texto=' + encodeURIComponent(textoHablado))
+                const params = new URLSearchParams({
+                    accion: 'hablarConArturo',
+                    texto: textoHablado,
+                    historial: JSON.stringify(conversacionArturo)
+                });
+
+                fetch(URL_BACKEND + '?' + params.toString())
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === "success") {
-                        const confirmado = confirm(
-                            `Escuché: "${textoHablado}"\n\nEntendí que su pedido es:\n${data.pedido}\n\n¿Es correcto? Presione Aceptar para agregarlo, o Cancelar para intentar de nuevo.`
-                        );
-                        if (confirmado) {
-                            alert(`Perfecto, agregado a su pedido: ${data.pedido}\n\nAhora seleccione también los productos en el catálogo si desea agregar algo más, y presione "Finalizar Pedido".`);
-                            // Guardamos el pedido de voz para incluirlo al finalizar
-                            window.pedidoDeVoz = data.pedido;
+                        conversacionArturo = data.historial;
+                        hablar(data.respuesta);
+
+                        if (data.terminado) {
+                            setTimeout(() => {
+                                alert(`✅ Pedido #${data.pedido_id} confirmado.\nTotal: $${Number(data.total).toLocaleString('es-CO')} COP`);
+                            }, 500);
+                            conversacionArturo = [];
+                            btnVoz.disabled = false;
+                            btnVoz.innerText = "🎤 Pedir por voz";
+                        } else {
+                            setTimeout(() => {
+                                btnVoz.disabled = false;
+                                btnVoz.innerText = "🎤 Pedir por voz";
+                                iniciarTurnoConversacion();
+                            }, 3000);
                         }
                     } else {
-                        alert(data.message || "No se pudo entender el pedido. Intente de nuevo.");
+                        alert(data.message || "Arturo no pudo entender. Intente de nuevo.");
+                        btnVoz.disabled = false;
+                        btnVoz.innerText = "🎤 Pedir por voz";
                     }
                 })
                 .catch(error => {
-                    alert("No se pudo conectar con el servidor para interpretar la voz.");
-                })
-                .finally(() => {
+                    alert("No se pudo conectar con Arturo.");
                     btnVoz.disabled = false;
                     btnVoz.innerText = "🎤 Pedir por voz";
                 });
             };
 
-            recognition.onerror = function(event) {
+            recognition.onerror = function() {
                 alert("No se pudo escuchar correctamente. Intente de nuevo.");
                 btnVoz.disabled = false;
                 btnVoz.innerText = "🎤 Pedir por voz";
@@ -142,11 +163,15 @@
             recognition.onspeechend = function() {
                 recognition.stop();
             };
+        }
+
+        btnVoz.onclick = function() {
+            iniciarTurnoConversacion();
         };
 
         btnFinalizar.onclick = function() {
-            if (productosSeleccionados.length === 0 && !window.pedidoDeVoz) {
-                alert("Por favor, seleccione al menos un producto o haga su pedido por voz.");
+            if (productosSeleccionados.length === 0) {
+                alert("Por favor, seleccione al menos un producto.");
                 return;
             }
 
@@ -163,12 +188,8 @@
                 formaPago = "No especificado";
             }
 
-            let nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
-            if (window.pedidoDeVoz) {
-                nombresPedido = nombresPedido ? (nombresPedido + ", " + window.pedidoDeVoz) : window.pedidoDeVoz;
-            }
+            const nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
 
-            // Armamos la URL con los datos del pedido como parámetros (GET, no POST)
             const params = new URLSearchParams({
                 accion: 'crearPedido',
                 fecha: new Date().toLocaleString(),
@@ -191,7 +212,6 @@
                     alert(`¡Pedido #${data.id} registrado correctamente!\nTotal: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
                     productosSeleccionados = [];
                     totalAcumulado = 0;
-                    window.pedidoDeVoz = null;
                     totalTXT.innerText = `COP $0`;
                     document.querySelectorAll('.producto.seleccionado').forEach(el => el.classList.remove('seleccionado'));
                 } else {
