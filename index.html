@@ -41,14 +41,6 @@
                 </div>
             </div>
 
-            <details style="width: 100%; margin-top: 4px;">
-                <summary style="cursor: pointer; color: #888; font-size: 13px;">⚙️ Ajustar voz de Arturo</summary>
-                <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                    <select id="voz-selector" style="padding: 5px;"></select>
-                    <button id="btn-probar-voz" style="padding: 5px 10px;">🔊 Probar voz</button>
-                </div>
-            </details>
-
         </div>
     </footer>
 
@@ -64,7 +56,6 @@
         let totalAcumulado = 0;
         let productosSeleccionados = [];
         let conversacionArturo = [];
-        let vozSeleccionada = null;
 
         function mostrarProductos(lista) {
             grid.innerHTML = '';
@@ -117,55 +108,33 @@
                 mostrarProductos(respaldoFijo);
             });
 
-        // ===== SELECTOR DE VOZ =====
-        function cargarVoces() {
-            const voces = speechSynthesis.getVoices();
-            const vocesEspanol = voces.filter(v => v.lang.toLowerCase().startsWith('es'));
-            const selector = document.getElementById('voz-selector');
-
-            selector.innerHTML = '';
-            vocesEspanol.forEach(v => {
-                const opt = document.createElement('option');
-                opt.value = v.name;
-                opt.textContent = `${v.name} (${v.lang})`;
-                selector.appendChild(opt);
+        // ===== VOZ DE SALIDA: ElevenLabs con respaldo del navegador =====
+        function hablar(texto) {
+            const params = new URLSearchParams({
+                accion: 'sintetizarVoz',
+                texto: texto
             });
 
-            const guardada = localStorage.getItem('vozArturo');
-            const encontrada = vocesEspanol.find(v => v.name === guardada);
-
-            if (encontrada) {
-                selector.value = encontrada.name;
-                vozSeleccionada = encontrada;
-            } else if (vocesEspanol.length > 0) {
-                vozSeleccionada = vocesEspanol[0];
-                selector.value = vozSeleccionada.name;
-            }
+            fetch(URL_BACKEND + '?' + params.toString())
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success" && data.audio) {
+                    const audio = new Audio('data:audio/mpeg;base64,' + data.audio);
+                    audio.play();
+                } else {
+                    // Si ElevenLabs falla (ej. se acabaron los créditos del mes), usamos la voz del navegador como respaldo
+                    hablarRespaldo(texto);
+                }
+            })
+            .catch(error => {
+                hablarRespaldo(texto);
+            });
         }
 
-        speechSynthesis.onvoiceschanged = cargarVoces;
-        cargarVoces();
-
-        document.getElementById('voz-selector').onchange = function() {
-            const voces = speechSynthesis.getVoices();
-            vozSeleccionada = voces.find(v => v.name === this.value);
-            localStorage.setItem('vozArturo', this.value);
-        };
-
-        document.getElementById('btn-probar-voz').onclick = function() {
-            hablar('Buenas, tienda de Don Arturo. ¿Qué producto desea llevar?');
-        };
-
-        function hablar(texto) {
+        function hablarRespaldo(texto) {
             const utterance = new SpeechSynthesisUtterance(texto);
-            if (vozSeleccionada) {
-                utterance.voice = vozSeleccionada;
-                utterance.lang = vozSeleccionada.lang;
-            } else {
-                utterance.lang = 'es-CO';
-            }
+            utterance.lang = 'es-CO';
             utterance.rate = 0.95;
-            utterance.pitch = 0.85;
             speechSynthesis.speak(utterance);
         }
 
@@ -181,13 +150,12 @@
             recognition.lang = 'es-CO';
             recognition.interimResults = false;
 
-            let yaProcesado = false; // evita que se quede "pegado" si nada responde
+            let yaProcesado = false;
 
             btnVoz.disabled = true;
             btnVoz.innerText = "🎤 Escuchando...";
             estadoArturo.innerText = "🎤 Escuchando... hable ahora.";
 
-            // Tiempo máximo de espera: si no detecta nada en 8 segundos, se detiene solo
             const timeoutSeguridad = setTimeout(() => {
                 if (!yaProcesado) {
                     recognition.stop();
@@ -228,7 +196,7 @@
                                 btnVoz.disabled = false;
                                 btnVoz.innerText = "🎤 Pedir por voz";
                                 iniciarTurnoConversacion();
-                            }, 3500);
+                            }, 4000);
                         }
                     } else {
                         estadoArturo.innerText = "⚠️ " + (data.message || "Arturo no pudo entender. Intente de nuevo.");
@@ -256,8 +224,6 @@
                 btnVoz.innerText = "🎤 Pedir por voz";
             };
 
-            // Red de seguridad final: si por cualquier razón termina sin resultado ni error,
-            // esto SIEMPRE se ejecuta y evita que el botón quede trabado.
             recognition.onend = function() {
                 clearTimeout(timeoutSeguridad);
                 if (!yaProcesado) {
@@ -272,7 +238,7 @@
             iniciarTurnoConversacion();
         };
 
-        // ===== FINALIZAR PEDIDO MANUAL (SOLO PARA PRODUCTOS TOCADOS EN PANTALLA) =====
+        // ===== FINALIZAR PEDIDO MANUAL =====
         btnFinalizar.onclick = function() {
             if (productosSeleccionados.length === 0) {
                 alert("Este botón es solo para pedidos armados tocando los productos del catálogo.\n\nSi ya habló con Arturo por voz, su pedido ya quedó registrado — no necesita presionar este botón.");
