@@ -14,26 +14,41 @@
 
     <main class="catalogo" id="grid"></main>
 
-    <div style="max-width: 900px; margin: 0 auto; padding: 10px 20px; color: #ccc; font-size: 14px;">
-        <p id="estado-arturo" style="min-height: 20px; font-style: italic;"></p>
-
-        <details style="margin-top: 10px;">
-            <summary style="cursor: pointer; color: #888;">⚙️ Ajustar voz de Arturo</summary>
-            <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <select id="voz-selector" style="padding: 5px;"></select>
-                <button id="btn-probar-voz" style="padding: 5px 10px;">🔊 Probar voz</button>
-            </div>
-        </details>
-    </div>
-
     <footer class="footer">
-        <div class="footer-content">
-            <div class="total-box">
-                Subtotal Estimado
-                <span id="total">COP $0</span>
+        <div class="footer-content" style="flex-direction: column; gap: 8px;">
+
+            <p id="estado-arturo" style="
+                width: 100%;
+                text-align: center;
+                min-height: 22px;
+                margin: 0;
+                padding: 6px;
+                color: #4ade80;
+                font-size: 14px;
+                font-style: italic;
+                background: rgba(0,0,0,0.3);
+                border-radius: 6px;
+            "></p>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div class="total-box">
+                    Subtotal Estimado
+                    <span id="total">COP $0</span>
+                </div>
+                <div>
+                    <button class="btn-finalizar" id="btn-voz" style="margin-right: 10px; background: #333;">🎤 Pedir por voz</button>
+                    <button class="btn-finalizar" id="btn-finalizar">Finalizar Pedido</button>
+                </div>
             </div>
-            <button class="btn-finalizar" id="btn-voz" style="margin-right: 10px; background: #333;">🎤 Pedir por voz</button>
-            <button class="btn-finalizar" id="btn-finalizar">Finalizar Pedido</button>
+
+            <details style="width: 100%; margin-top: 4px;">
+                <summary style="cursor: pointer; color: #888; font-size: 13px;">⚙️ Ajustar voz de Arturo</summary>
+                <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <select id="voz-selector" style="padding: 5px;"></select>
+                    <button id="btn-probar-voz" style="padding: 5px 10px;">🔊 Probar voz</button>
+                </div>
+            </details>
+
         </div>
     </footer>
 
@@ -150,7 +165,7 @@
                 utterance.lang = 'es-CO';
             }
             utterance.rate = 0.95;
-            utterance.pitch = 0.85; // un poco más grave, sin importar la voz base
+            utterance.pitch = 0.85;
             speechSynthesis.speak(utterance);
         }
 
@@ -166,12 +181,25 @@
             recognition.lang = 'es-CO';
             recognition.interimResults = false;
 
+            let yaProcesado = false; // evita que se quede "pegado" si nada responde
+
             btnVoz.disabled = true;
             btnVoz.innerText = "🎤 Escuchando...";
             estadoArturo.innerText = "🎤 Escuchando... hable ahora.";
+
+            // Tiempo máximo de espera: si no detecta nada en 8 segundos, se detiene solo
+            const timeoutSeguridad = setTimeout(() => {
+                if (!yaProcesado) {
+                    recognition.stop();
+                }
+            }, 8000);
+
             recognition.start();
 
             recognition.onresult = function(event) {
+                yaProcesado = true;
+                clearTimeout(timeoutSeguridad);
+
                 const textoHablado = event.results[0][0].transcript;
                 btnVoz.innerText = "🎤 Arturo está pensando...";
                 estadoArturo.innerText = `Escuché: "${textoHablado}" — Arturo está pensando...`;
@@ -215,14 +243,28 @@
                 });
             };
 
-            recognition.onerror = function() {
-                estadoArturo.innerText = "⚠️ No se pudo escuchar correctamente. Intente de nuevo.";
+            recognition.onerror = function(event) {
+                yaProcesado = true;
+                clearTimeout(timeoutSeguridad);
+
+                if (event.error === 'no-speech') {
+                    estadoArturo.innerText = "🤔 No escuché nada. Toque el botón e intente de nuevo.";
+                } else {
+                    estadoArturo.innerText = "⚠️ No se pudo escuchar correctamente. Intente de nuevo.";
+                }
                 btnVoz.disabled = false;
                 btnVoz.innerText = "🎤 Pedir por voz";
             };
 
-            recognition.onspeechend = function() {
-                recognition.stop();
+            // Red de seguridad final: si por cualquier razón termina sin resultado ni error,
+            // esto SIEMPRE se ejecuta y evita que el botón quede trabado.
+            recognition.onend = function() {
+                clearTimeout(timeoutSeguridad);
+                if (!yaProcesado) {
+                    estadoArturo.innerText = "🤔 No escuché nada. Toque el botón e intente de nuevo.";
+                    btnVoz.disabled = false;
+                    btnVoz.innerText = "🎤 Pedir por voz";
+                }
             };
         }
 
