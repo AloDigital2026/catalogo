@@ -5,6 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tienda Don Arturo - Catálogo Premium</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .selector-cantidad {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .btn-cantidad {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            background: #333;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .btn-cantidad:hover { background: #555; }
+        .btn-cantidad:disabled { background: #ccc; cursor: not-allowed; }
+        .cantidad-numero {
+            min-width: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .producto.seleccionado { border-color: #4ade80; }
+    </style>
 </head>
 <body>
 
@@ -54,14 +86,47 @@
         const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbzDPoeuLQOOKbS_3eblLFcuRUmYr1Wsxjq5pM2tQKUbSNXOCraqe4QrGKp-8q0MZkzmqw/exec';
 
         let totalAcumulado = 0;
-        let productosSeleccionados = [];
         let conversacionArturo = [];
+
+        // Cantidades seleccionadas, guardadas por id de producto: { id: { producto, cantidad } }
+        let cantidades = {};
+
+        function recalcularTotal() {
+            totalAcumulado = 0;
+            Object.values(cantidades).forEach(item => {
+                totalAcumulado += item.producto.precio * item.cantidad;
+            });
+            totalTXT.innerText = `COP $${totalAcumulado.toLocaleString('es-CO')}`;
+        }
+
+        function actualizarTarjeta(prod) {
+            const cantidadActual = cantidades[prod.id] ? cantidades[prod.id].cantidad : 0;
+            const numeroEl = document.getElementById(`cantidad-${prod.id}`);
+            const cardEl = document.getElementById(`card-${prod.id}`);
+            if (numeroEl) numeroEl.innerText = cantidadActual;
+            if (cardEl) cardEl.classList.toggle('seleccionado', cantidadActual > 0);
+        }
+
+        function cambiarCantidad(prod, delta) {
+            const actual = cantidades[prod.id] ? cantidades[prod.id].cantidad : 0;
+            const nueva = Math.max(0, actual + delta);
+
+            if (nueva === 0) {
+                delete cantidades[prod.id];
+            } else {
+                cantidades[prod.id] = { producto: prod, cantidad: nueva };
+            }
+
+            actualizarTarjeta(prod);
+            recalcularTotal();
+        }
 
         function mostrarProductos(lista) {
             grid.innerHTML = '';
             lista.forEach(prod => {
                 const card = document.createElement('div');
                 card.className = 'producto';
+                card.id = `card-${prod.id}`;
 
                 card.innerHTML = `
                     <div class="indicador"></div>
@@ -70,21 +135,15 @@
                     </div>
                     <h3>${prod.nombre}</h3>
                     <div class="precio">COP $${prod.precio.toLocaleString('es-CO')}</div>
+                    <div class="selector-cantidad">
+                        <button class="btn-cantidad" data-accion="menos">−</button>
+                        <span class="cantidad-numero" id="cantidad-${prod.id}">0</span>
+                        <button class="btn-cantidad" data-accion="mas">+</button>
+                    </div>
                 `;
 
-                card.onclick = function() {
-                    card.classList.toggle('seleccionado');
-
-                    if (card.classList.contains('seleccionado')) {
-                        totalAcumulado += prod.precio;
-                        productosSeleccionados.push(prod);
-                    } else {
-                        totalAcumulado -= prod.precio;
-                        productosSeleccionados = productosSeleccionados.filter(item => item.id !== prod.id);
-                    }
-
-                    totalTXT.innerText = `COP $${totalAcumulado.toLocaleString('es-CO')}`;
-                };
+                card.querySelector('[data-accion="menos"]').onclick = () => cambiarCantidad(prod, -1);
+                card.querySelector('[data-accion="mas"]').onclick = () => cambiarCantidad(prod, 1);
 
                 grid.appendChild(card);
             });
@@ -122,7 +181,6 @@
                     const audio = new Audio('data:audio/mpeg;base64,' + data.audio);
                     audio.play();
                 } else {
-                    // Si ElevenLabs falla (ej. se acabaron los créditos del mes), usamos la voz del navegador como respaldo
                     hablarRespaldo(texto);
                 }
             })
@@ -240,8 +298,10 @@
 
         // ===== FINALIZAR PEDIDO MANUAL =====
         btnFinalizar.onclick = function() {
-            if (productosSeleccionados.length === 0) {
-                alert("Este botón es solo para pedidos armados tocando los productos del catálogo.\n\nSi ya habló con Arturo por voz, su pedido ya quedó registrado — no necesita presionar este botón.");
+            const itemsSeleccionados = Object.values(cantidades);
+
+            if (itemsSeleccionados.length === 0) {
+                alert("Este botón es solo para pedidos armados con el catálogo (use los botones + y − para elegir cantidades).\n\nSi ya habló con Arturo por voz, su pedido ya quedó registrado — no necesita presionar este botón.");
                 return;
             }
 
@@ -258,7 +318,9 @@
                 formaPago = "No especificado";
             }
 
-            const nombresPedido = productosSeleccionados.map(p => p.nombre).join(", ");
+            const nombresPedido = itemsSeleccionados
+                .map(item => `${item.producto.nombre} x${item.cantidad}`)
+                .join(", ");
 
             const params = new URLSearchParams({
                 accion: 'crearPedido',
@@ -280,10 +342,13 @@
             .then(data => {
                 if (data.status === "success") {
                     alert(`¡Pedido #${data.id} registrado correctamente!\nTotal: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
-                    productosSeleccionados = [];
-                    totalAcumulado = 0;
-                    totalTXT.innerText = `COP $0`;
-                    document.querySelectorAll('.producto.seleccionado').forEach(el => el.classList.remove('seleccionado'));
+                    cantidades = {};
+                    recalcularTotal();
+                    document.querySelectorAll('.producto').forEach(card => {
+                        card.classList.remove('seleccionado');
+                        const numeroEl = card.querySelector('.cantidad-numero');
+                        if (numeroEl) numeroEl.innerText = '0';
+                    });
                 } else {
                     alert("Error al registrar el pedido: " + data.message);
                 }
