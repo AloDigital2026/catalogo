@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda Don Arturo - Catálogo Premium</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .selector-cantidad {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .btn-cantidad {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            background: #333;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .btn-cantidad:hover { background: #555; }
+        .btn-cantidad:disabled { background: #ccc; cursor: not-allowed; }
+        .cantidad-numero {
+            min-width: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .producto.seleccionado { border-color: #4ade80; }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>Tienda Don Arturo - <span>Catálogo Premium</span></h1>
+    </header>
+
+    <main class="catalogo" id="grid"></main>
+
+    <footer class="footer">
+        <div class="footer-content" style="flex-direction: column; gap: 8px;">
+
+            <p id="estado-arturo" style="
+                width: 100%;
+                text-align: center;
+                min-height: 22px;
+                margin: 0;
+                padding: 6px;
+                color: #4ade80;
+                font-size: 14px;
+                font-style: italic;
+                background: rgba(0,0,0,0.3);
+                border-radius: 6px;
+            "></p>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div class="total-box">
+                    Subtotal Estimado
+                    <span id="total">COP $0</span>
+                </div>
+                <div>
+                    <button class="btn-finalizar" id="btn-voz" style="margin-right: 10px; background: #333;">🎤 Pedir por voz</button>
+                    <button class="btn-finalizar" id="btn-finalizar">Finalizar Pedido</button>
+                </div>
+            </div>
+
+        </div>
+    </footer>
+
+    <script>
+        const grid = document.getElementById('grid');
+        const totalTXT = document.getElementById('total');
+        const btnFinalizar = document.getElementById('btn-finalizar');
+        const btnVoz = document.getElementById('btn-voz');
+        const estadoArturo = document.getElementById('estado-arturo');
+
+        const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbzDPoeuLQOOKbS_3eblLFcuRUmYr1Wsxjq5pM2tQKUbSNXOCraqe4QrGKp-8q0MZkzmqw/exec';
+
+        let totalAcumulado = 0;
+        let conversacionArturo = [];
+
+        // Cantidades seleccionadas, guardadas por id de producto: { id: { producto, cantidad } }
+        let cantidades = {};
+
+        function recalcularTotal() {
+            totalAcumulado = 0;
+            Object.values(cantidades).forEach(item => {
+                totalAcumulado += item.producto.precio * item.cantidad;
+            });
+            totalTXT.innerText = `COP $${totalAcumulado.toLocaleString('es-CO')}`;
+        }
+
+        function actualizarTarjeta(prod) {
+            const cantidadActual = cantidades[prod.id] ? cantidades[prod.id].cantidad : 0;
+            const numeroEl = document.getElementById(`cantidad-${prod.id}`);
+            const cardEl = document.getElementById(`card-${prod.id}`);
+            if (numeroEl) numeroEl.innerText = cantidadActual;
+            if (cardEl) cardEl.classList.toggle('seleccionado', cantidadActual > 0);
+        }
+
+        function cambiarCantidad(prod, delta) {
+            const actual = cantidades[prod.id] ? cantidades[prod.id].cantidad : 0;
+            const nueva = Math.max(0, actual + delta);
+
+            if (nueva === 0) {
+                delete cantidades[prod.id];
+            } else {
+                cantidades[prod.id] = { producto: prod, cantidad: nueva };
+            }
+
+            actualizarTarjeta(prod);
+            recalcularTotal();
+        }
+
+        function mostrarProductos(lista) {
+            grid.innerHTML = '';
+            lista.forEach(prod => {
+                const card = document.createElement('div');
+                card.className = 'producto';
+                card.id = `card-${prod.id}`;
+
+                card.innerHTML = `
+                    <div class="indicador"></div>
+                    <div class="img-placeholder">
+                        <img src="img/${prod.img}" alt="${prod.nombre}" class="img-producto">
+                    </div>
+                    <h3>${prod.nombre}</h3>
+                    <div class="precio">COP $${prod.precio.toLocaleString('es-CO')}</div>
+                    <div class="selector-cantidad">
+                        <button class="btn-cantidad" data-accion="menos">−</button>
+                        <span class="cantidad-numero" id="cantidad-${prod.id}">0</span>
+                        <button class="btn-cantidad" data-accion="mas">+</button>
+                    </div>
+                `;
+
+                card.querySelector('[data-accion="menos"]').onclick = () => cambiarCantidad(prod, -1);
+                card.querySelector('[data-accion="mas"]').onclick = () => cambiarCantidad(prod, 1);
+
+                grid.appendChild(card);
+            });
+        }
+
+        fetch('productos.json')
+            .then(response => {
+                if (!response.ok) throw new Error('Error al cargar JSON');
+                return response.json();
+            })
+            .then(data => mostrarProductos(data))
+            .catch(error => {
+                const respaldoFijo = [
+                    { "id": 1, "nombre": "Leche Alquería (1 Litro)", "precio": 4900, "img": "prod_01.jpg" },
+                    { "id": 2, "nombre": "Pan Tajado Bimbo Grande", "precio": 9200, "img": "prod_02.jpg" },
+                    { "id": 3, "nombre": "Chocolatinas Surtidas", "precio": 3500, "img": "prod_03.jpg" },
+                    { "id": 4, "nombre": "Azúcar Manuelita (1 Kg)", "precio": 4200, "img": "prod_04.jpg" },
+                    { "id": 5, "nombre": "Café Sello Rojo (250g)", "precio": 6800, "img": "prod_05.jpg" },
+                    { "id": 6, "nombre": "Aceite Premier (1.000 ml)", "precio": 12800, "img": "prod_06.jpg" }
+                ];
+                mostrarProductos(respaldoFijo);
+            });
+
+        // ===== VOZ DE SALIDA: ElevenLabs con respaldo del navegador =====
+        function hablar(texto) {
+            const params = new URLSearchParams({
+                accion: 'sintetizarVoz',
+                texto: texto
+            });
+
+            fetch(URL_BACKEND + '?' + params.toString())
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success" && data.audio) {
+                    const audio = new Audio('data:audio/mpeg;base64,' + data.audio);
+                    audio.play();
+                } else {
+                    hablarRespaldo(texto);
+                }
+            })
+            .catch(error => {
+                hablarRespaldo(texto);
+            });
+        }
+
+        function hablarRespaldo(texto) {
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'es-CO';
+            utterance.rate = 0.95;
+            speechSynthesis.speak(utterance);
+        }
+
+        // ===== CONVERSACIÓN CON ARTURO =====
+        function iniciarTurnoConversacion() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                estadoArturo.innerText = "⚠️ Su navegador no soporta pedidos por voz. Use Chrome.";
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'es-CO';
+            recognition.interimResults = false;
+
+            let yaProcesado = false;
+
+            btnVoz.disabled = true;
+            btnVoz.innerText = "🎤 Escuchando...";
+            estadoArturo.innerText = "🎤 Escuchando... hable ahora.";
+
+            const timeoutSeguridad = setTimeout(() => {
+                if (!yaProcesado) {
+                    recognition.stop();
+                }
+            }, 8000);
+
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                yaProcesado = true;
+                clearTimeout(timeoutSeguridad);
+
+                const textoHablado = event.results[0][0].transcript;
+                btnVoz.innerText = "🎤 Arturo está pensando...";
+                estadoArturo.innerText = `Escuché: "${textoHablado}" — Arturo está pensando...`;
+
+                const params = new URLSearchParams({
+                    accion: 'hablarConArturo',
+                    texto: textoHablado,
+                    historial: JSON.stringify(conversacionArturo)
+                });
+
+                fetch(URL_BACKEND + '?' + params.toString())
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        conversacionArturo = data.historial;
+                        estadoArturo.innerText = `🗣️ Arturo: ${data.respuesta}`;
+                        hablar(data.respuesta);
+
+                        if (data.terminado) {
+                            estadoArturo.innerText = `✅ Pedido #${data.pedido_id} confirmado — Total: $${Number(data.total).toLocaleString('es-CO')} COP`;
+                            conversacionArturo = [];
+                            btnVoz.disabled = false;
+                            btnVoz.innerText = "🎤 Pedir por voz";
+                        } else {
+                            setTimeout(() => {
+                                btnVoz.disabled = false;
+                                btnVoz.innerText = "🎤 Pedir por voz";
+                                iniciarTurnoConversacion();
+                            }, 4000);
+                        }
+                    } else {
+                        estadoArturo.innerText = "⚠️ " + (data.message || "Arturo no pudo entender. Intente de nuevo.");
+                        btnVoz.disabled = false;
+                        btnVoz.innerText = "🎤 Pedir por voz";
+                    }
+                })
+                .catch(error => {
+                    estadoArturo.innerText = "❌ No se pudo conectar con Arturo.";
+                    btnVoz.disabled = false;
+                    btnVoz.innerText = "🎤 Pedir por voz";
+                });
+            };
+
+            recognition.onerror = function(event) {
+                yaProcesado = true;
+                clearTimeout(timeoutSeguridad);
+
+                if (event.error === 'no-speech') {
+                    estadoArturo.innerText = "🤔 No escuché nada. Toque el botón e intente de nuevo.";
+                } else {
+                    estadoArturo.innerText = "⚠️ No se pudo escuchar correctamente. Intente de nuevo.";
+                }
+                btnVoz.disabled = false;
+                btnVoz.innerText = "🎤 Pedir por voz";
+            };
+
+            recognition.onend = function() {
+                clearTimeout(timeoutSeguridad);
+                if (!yaProcesado) {
+                    estadoArturo.innerText = "🤔 No escuché nada. Toque el botón e intente de nuevo.";
+                    btnVoz.disabled = false;
+                    btnVoz.innerText = "🎤 Pedir por voz";
+                }
+            };
+        }
+
+        btnVoz.onclick = function() {
+            iniciarTurnoConversacion();
+        };
+
+        // ===== FINALIZAR PEDIDO MANUAL =====
+        btnFinalizar.onclick = function() {
+            const itemsSeleccionados = Object.values(cantidades);
+
+            if (itemsSeleccionados.length === 0) {
+                alert("Este botón es solo para pedidos armados con el catálogo (use los botones + y − para elegir cantidades).\n\nSi ya habló con Arturo por voz, su pedido ya quedó registrado — no necesita presionar este botón.");
+                return;
+            }
+
+            const direccion = prompt("Ingrese la dirección de entrega:");
+            if (!direccion) {
+                alert("Debe ingresar una dirección para continuar.");
+                return;
+            }
+
+            const observaciones = prompt("Observaciones (opcional): ej. sin bolsa, tocar el timbre, cambiar marca...") || "";
+
+            let formaPago = prompt("¿Cómo desea pagar? Escriba: Efectivo, Nequi, Daviplata o Tarjeta");
+            if (!formaPago) {
+                formaPago = "No especificado";
+            }
+
+            const nombresPedido = itemsSeleccionados
+                .map(item => `${item.producto.nombre} x${item.cantidad}`)
+                .join(", ");
+
+            const params = new URLSearchParams({
+                accion: 'crearPedido',
+                fecha: new Date().toLocaleString(),
+                direccion: direccion,
+                pedido: nombresPedido,
+                total: totalAcumulado,
+                origen: 'Web Catálogo',
+                pago: formaPago,
+                notas: observaciones,
+                estado: 'Recibido'
+            });
+
+            btnFinalizar.disabled = true;
+            btnFinalizar.innerText = "Enviando...";
+
+            fetch(URL_BACKEND + '?' + params.toString())
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    alert(`¡Pedido #${data.id} registrado correctamente!\nTotal: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
+                    cantidades = {};
+                    recalcularTotal();
+                    document.querySelectorAll('.producto').forEach(card => {
+                        card.classList.remove('seleccionado');
+                        const numeroEl = card.querySelector('.cantidad-numero');
+                        if (numeroEl) numeroEl.innerText = '0';
+                    });
+                } else {
+                    alert("Error al registrar el pedido: " + data.message);
+                }
+            })
+            .catch(error => {
+                alert("No se pudo conectar con el servidor. Intente nuevamente.");
+            })
+            .finally(() => {
+                btnFinalizar.disabled = false;
+                btnFinalizar.innerText = "Finalizar Pedido";
+            });
+        };
+    </script>
+</body>
+</html>
