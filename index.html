@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -29,13 +30,69 @@
             line-height: 1;
         }
         .btn-cantidad:hover { background: #555; }
-        .btn-cantidad:disabled { background: #ccc; cursor: not-allowed; }
         .cantidad-numero {
             min-width: 20px;
             text-align: center;
             font-weight: bold;
         }
         .producto.seleccionado { border-color: #4ade80; }
+
+        /* ===== Chat de texto con Arturo ===== */
+        #chat-arturo {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto 12px;
+            background: rgba(0,0,0,0.35);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        #chat-historial {
+            max-height: 160px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px;
+            padding-right: 4px;
+        }
+        .msg-chat {
+            font-size: 13px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            max-width: 85%;
+            line-height: 1.3;
+        }
+        .msg-cliente {
+            align-self: flex-end;
+            background: #2563eb;
+            color: white;
+        }
+        .msg-arturo {
+            align-self: flex-start;
+            background: #333;
+            color: #eee;
+        }
+        #chat-form {
+            display: flex;
+            gap: 6px;
+        }
+        #chat-input {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+        }
+        #chat-enviar {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            background: #4ade80;
+            color: #14181C;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #chat-enviar:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -49,18 +106,13 @@
     <footer class="footer">
         <div class="footer-content" style="flex-direction: column; gap: 8px;">
 
-            <p id="estado-arturo" style="
-                width: 100%;
-                text-align: center;
-                min-height: 22px;
-                margin: 0;
-                padding: 6px;
-                color: #4ade80;
-                font-size: 14px;
-                font-style: italic;
-                background: rgba(0,0,0,0.3);
-                border-radius: 6px;
-            "></p>
+            <div id="chat-arturo">
+                <div id="chat-historial"></div>
+                <form id="chat-form">
+                    <input type="text" id="chat-input" placeholder="Escríbale a Arturo su pedido..." autocomplete="off">
+                    <button type="submit" id="chat-enviar">Enviar</button>
+                </form>
+            </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <div class="total-box">
@@ -68,7 +120,6 @@
                     <span id="total">COP $0</span>
                 </div>
                 <div>
-                    <button class="btn-finalizar" id="btn-voz" style="margin-right: 10px; background: #333;">🎤 Pedir por voz</button>
                     <button class="btn-finalizar" id="btn-finalizar">Finalizar Pedido</button>
                 </div>
             </div>
@@ -80,15 +131,10 @@
         const grid = document.getElementById('grid');
         const totalTXT = document.getElementById('total');
         const btnFinalizar = document.getElementById('btn-finalizar');
-        const btnVoz = document.getElementById('btn-voz');
-        const estadoArturo = document.getElementById('estado-arturo');
 
         const URL_BACKEND = 'https://script.google.com/macros/s/AKfycbzDPoeuLQOOKbS_3eblLFcuRUmYr1Wsxjq5pM2tQKUbSNXOCraqe4QrGKp-8q0MZkzmqw/exec';
 
         let totalAcumulado = 0;
-        let conversacionArturo = [];
-
-        // Cantidades seleccionadas, guardadas por id de producto: { id: { producto, cantidad } }
         let cantidades = {};
 
         function recalcularTotal() {
@@ -167,141 +213,69 @@
                 mostrarProductos(respaldoFijo);
             });
 
-        // ===== VOZ DE SALIDA: ElevenLabs con respaldo del navegador =====
-        function hablar(texto) {
+        // ===== CHAT DE TEXTO CON ARTURO =====
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatEnviar = document.getElementById('chat-enviar');
+        const chatHistorial = document.getElementById('chat-historial');
+
+        let conversacionArturo = [];
+
+        function agregarMensajeChat(texto, esCliente) {
+            const div = document.createElement('div');
+            div.className = 'msg-chat ' + (esCliente ? 'msg-cliente' : 'msg-arturo');
+            div.innerText = texto;
+            chatHistorial.appendChild(div);
+            chatHistorial.scrollTop = chatHistorial.scrollHeight;
+        }
+
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const texto = chatInput.value.trim();
+            if (!texto) return;
+
+            agregarMensajeChat(texto, true);
+            chatInput.value = '';
+            chatInput.disabled = true;
+            chatEnviar.disabled = true;
+
             const params = new URLSearchParams({
-                accion: 'sintetizarVoz',
-                texto: texto
+                accion: 'hablarConArturo',
+                texto: texto,
+                historial: JSON.stringify(conversacionArturo)
             });
 
             fetch(URL_BACKEND + '?' + params.toString())
             .then(response => response.json())
             .then(data => {
-                if (data.status === "success" && data.audio) {
-                    const audio = new Audio('data:audio/mpeg;base64,' + data.audio);
-                    audio.play();
+                if (data.status === "success") {
+                    conversacionArturo = data.historial;
+                    agregarMensajeChat(data.respuesta, false);
+
+                    if (data.terminado) {
+                        agregarMensajeChat(`✅ Pedido #${data.pedido_id} confirmado.`, false);
+                        conversacionArturo = [];
+                    }
                 } else {
-                    hablarRespaldo(texto);
+                    agregarMensajeChat("⚠️ " + (data.message || "No pude entender, intente de nuevo."), false);
                 }
             })
             .catch(error => {
-                hablarRespaldo(texto);
+                agregarMensajeChat("❌ No se pudo conectar. Intente de nuevo.", false);
+            })
+            .finally(() => {
+                chatInput.disabled = false;
+                chatEnviar.disabled = false;
+                chatInput.focus();
             });
-        }
+        });
 
-        function hablarRespaldo(texto) {
-            const utterance = new SpeechSynthesisUtterance(texto);
-            utterance.lang = 'es-CO';
-            utterance.rate = 0.95;
-            speechSynthesis.speak(utterance);
-        }
-
-        // ===== CONVERSACIÓN CON ARTURO =====
-        function iniciarTurnoConversacion() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                estadoArturo.innerText = "⚠️ Su navegador no soporta pedidos por voz. Use Chrome.";
-                return;
-            }
-
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'es-CO';
-            recognition.interimResults = false;
-
-            let yaProcesado = false;
-
-            btnVoz.disabled = true;
-            btnVoz.innerText = "🎤 Escuchando...";
-            estadoArturo.innerText = "🎤 Escuchando... hable ahora.";
-
-            const timeoutSeguridad = setTimeout(() => {
-                if (!yaProcesado) {
-                    recognition.stop();
-                }
-            }, 8000);
-
-            recognition.start();
-
-            recognition.onresult = function(event) {
-                yaProcesado = true;
-                clearTimeout(timeoutSeguridad);
-
-                const textoHablado = event.results[0][0].transcript;
-                btnVoz.innerText = "🎤 Arturo está pensando...";
-                estadoArturo.innerText = `Escuché: "${textoHablado}" — Arturo está pensando...`;
-
-                const params = new URLSearchParams({
-                    accion: 'hablarConArturo',
-                    texto: textoHablado,
-                    historial: JSON.stringify(conversacionArturo)
-                });
-
-                fetch(URL_BACKEND + '?' + params.toString())
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === "success") {
-                        conversacionArturo = data.historial;
-                        estadoArturo.innerText = `🗣️ Arturo: ${data.respuesta}`;
-                        hablar(data.respuesta);
-
-                        if (data.terminado) {
-                            estadoArturo.innerText = `✅ Pedido #${data.pedido_id} confirmado — Total: $${Number(data.total).toLocaleString('es-CO')} COP`;
-                            conversacionArturo = [];
-                            btnVoz.disabled = false;
-                            btnVoz.innerText = "🎤 Pedir por voz";
-                        } else {
-                            setTimeout(() => {
-                                btnVoz.disabled = false;
-                                btnVoz.innerText = "🎤 Pedir por voz";
-                                iniciarTurnoConversacion();
-                            }, 4000);
-                        }
-                    } else {
-                        estadoArturo.innerText = "⚠️ " + (data.message || "Arturo no pudo entender. Intente de nuevo.");
-                        btnVoz.disabled = false;
-                        btnVoz.innerText = "🎤 Pedir por voz";
-                    }
-                })
-                .catch(error => {
-                    estadoArturo.innerText = "❌ No se pudo conectar con Arturo.";
-                    btnVoz.disabled = false;
-                    btnVoz.innerText = "🎤 Pedir por voz";
-                });
-            };
-
-            recognition.onerror = function(event) {
-                yaProcesado = true;
-                clearTimeout(timeoutSeguridad);
-
-                if (event.error === 'no-speech') {
-                    estadoArturo.innerText = "🤔 No escuché nada. Toque el botón e intente de nuevo.";
-                } else {
-                    estadoArturo.innerText = "⚠️ No se pudo escuchar correctamente. Intente de nuevo.";
-                }
-                btnVoz.disabled = false;
-                btnVoz.innerText = "🎤 Pedir por voz";
-            };
-
-            recognition.onend = function() {
-                clearTimeout(timeoutSeguridad);
-                if (!yaProcesado) {
-                    estadoArturo.innerText = "🤔 No escuché nada. Toque el botón e intente de nuevo.";
-                    btnVoz.disabled = false;
-                    btnVoz.innerText = "🎤 Pedir por voz";
-                }
-            };
-        }
-
-        btnVoz.onclick = function() {
-            iniciarTurnoConversacion();
-        };
-
-        // ===== FINALIZAR PEDIDO MANUAL =====
+        // ===== FINALIZAR PEDIDO MANUAL (armado con el catálogo) =====
         btnFinalizar.onclick = function() {
             const itemsSeleccionados = Object.values(cantidades);
 
             if (itemsSeleccionados.length === 0) {
-                alert("Este botón es solo para pedidos armados con el catálogo (use los botones + y − para elegir cantidades).\n\nSi ya habló con Arturo por voz, su pedido ya quedó registrado — no necesita presionar este botón.");
+                alert("Este botón es solo para pedidos armados con el catálogo (use los botones + y − para elegir cantidades).\n\nSi ya le escribió a Arturo por el chat, su pedido ya quedó registrado — no necesita presionar este botón.");
                 return;
             }
 
@@ -364,4 +338,3 @@
     </script>
 </body>
 </html>
-
