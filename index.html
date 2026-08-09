@@ -220,12 +220,24 @@
 
         let conversacionArturo = [];
 
+        // ===== Espacio reservado abajo para que la barra fija nunca tape productos =====
+        // La barra de abajo (footer) cambia de alto según el contenido del chat,
+        // así que medimos su alto real y ajustamos el espacio del catálogo a ese tamaño,
+        // en vez de dejar un número fijo que se desactualiza cuando algo cambia.
+        const footerEl = document.querySelector('.footer');
+        function ajustarEspacioParaFooter() {
+            document.body.style.paddingBottom = (footerEl.offsetHeight + 24) + 'px';
+        }
+        window.addEventListener('load', ajustarEspacioParaFooter);
+        window.addEventListener('resize', ajustarEspacioParaFooter);
+
         function agregarMensajeChat(texto, esCliente) {
             const div = document.createElement('div');
             div.className = 'msg-chat ' + (esCliente ? 'msg-cliente' : 'msg-arturo');
             div.innerText = texto;
             chatHistorial.appendChild(div);
             chatHistorial.scrollTop = chatHistorial.scrollHeight;
+            ajustarEspacioParaFooter();
         }
 
         chatForm.addEventListener('submit', function(e) {
@@ -347,3 +359,4 @@
     </script>
 </body>
 </html>
+
