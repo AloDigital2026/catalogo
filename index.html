@@ -254,6 +254,9 @@
                     if (data.terminado) {
                         agregarMensajeChat(`✅ Pedido #${data.pedido_id} confirmado.`, false);
                         conversacionArturo = [];
+                        setTimeout(() => {
+                            chatHistorial.innerHTML = '';
+                        }, 4000);
                     }
                 } else {
                     agregarMensajeChat("⚠️ " + (data.message || "No pude entender, intente de nuevo."), false);
