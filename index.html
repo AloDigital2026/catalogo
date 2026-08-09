@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -296,6 +295,12 @@
                 .map(item => `${item.producto.nombre} x${item.cantidad}`)
                 .join(", ");
 
+            const itemsParaDetalle = itemsSeleccionados.map(item => ({
+                producto: item.producto.nombre,
+                cantidad: item.cantidad,
+                precio_unitario: item.producto.precio
+            }));
+
             const params = new URLSearchParams({
                 accion: 'crearPedido',
                 fecha: new Date().toLocaleString(),
@@ -305,7 +310,8 @@
                 origen: 'Web Catálogo',
                 pago: formaPago,
                 notas: observaciones,
-                estado: 'Recibido'
+                estado: 'Recibido',
+                items: JSON.stringify(itemsParaDetalle)
             });
 
             btnFinalizar.disabled = true;
