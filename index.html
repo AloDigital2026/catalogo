@@ -201,12 +201,33 @@
             });
         }
 
+        // Las fotos (productos.json) son fijas — se suben a mano cuando hay foto real.
+        // El nombre, precio y disponibilidad vienen en vivo de la hoja, igual que Arturo.
         fetch('productos.json')
             .then(response => {
                 if (!response.ok) throw new Error('Error al cargar JSON');
                 return response.json();
             })
-            .then(data => mostrarProductos(data))
+            .then(fotos => {
+                fetch(URL_BACKEND + '?accion=obtenerCatalogoWeb')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status !== 'success') throw new Error('Catálogo en vivo no disponible');
+                        const enVivoPorId = {};
+                        data.productos.forEach(p => { enVivoPorId[p.id] = p; });
+
+                        const combinados = fotos
+                            .map(foto => {
+                                const vivo = enVivoPorId[foto.id];
+                                if (!vivo) return null; // el producto ya no existe en la hoja
+                                return { id: foto.id, img: foto.img, nombre: vivo.nombre, precio: vivo.precio, disponible: vivo.disponible };
+                            })
+                            .filter(p => p && p.disponible); // oculta lo que el tendero marcó agotado
+
+                        mostrarProductos(combinados);
+                    })
+                    .catch(() => mostrarProductos(fotos)); // si falla el backend, muestra las fotos con sus precios fijos
+            })
             .catch(error => {
                 const respaldoFijo = [
                     { "id": 1, "nombre": "Leche Alquería (1 Litro)", "precio": 4900, "img": "prod_01.jpg" },
@@ -366,6 +387,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
