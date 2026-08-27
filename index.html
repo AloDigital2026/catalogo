@@ -17,9 +17,9 @@
             width: 28px;
             height: 28px;
             border-radius: 50%;
-            border: none;
-            background: #333;
-            color: white;
+            border: 1px solid rgba(48,209,88,0.35);
+            background: #1a1a1a;
+            color: #30D158;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
@@ -27,14 +27,15 @@
             align-items: center;
             justify-content: center;
             line-height: 1;
+            transition: all 0.2s ease;
         }
-        .btn-cantidad:hover { background: #555; }
+        .btn-cantidad:hover { background: #30D158; color: #000; border-color: #30D158; }
         .cantidad-numero {
             min-width: 20px;
             text-align: center;
             font-weight: bold;
         }
-        .producto.seleccionado { border-color: #4ade80; }
+        .producto.seleccionado { border-color: #30D158; }
 
         /* ===== Chat de texto con Arturo ===== */
         #chat-arturo {
@@ -44,6 +45,14 @@
             background: rgba(0,0,0,0.35);
             border-radius: 10px;
             padding: 10px;
+        }
+        #chat-input {
+            box-shadow: 0 0 8px rgba(48,209,88,0.35), 0 0 2px rgba(48,209,88,0.5) inset;
+            transition: box-shadow 0.25s ease;
+        }
+        #chat-input:focus {
+            outline: none;
+            box-shadow: 0 0 14px rgba(48,209,88,0.6), 0 0 3px rgba(48,209,88,0.7) inset;
         }
         #chat-historial {
             max-height: 160px;
@@ -63,7 +72,7 @@
         }
         .msg-cliente {
             align-self: flex-end;
-            background: #2563eb;
+            background: #1F6642;
             color: white;
         }
         .msg-arturo {
@@ -86,8 +95,8 @@
             padding: 10px 16px;
             border-radius: 8px;
             border: none;
-            background: #4ade80;
-            color: #14181C;
+            background: #30D158;
+            color: #000000;
             font-weight: bold;
             cursor: pointer;
         }
@@ -296,7 +305,7 @@
                         conversacionArturo = [];
                         setTimeout(() => {
                             chatHistorial.innerHTML = '';
-                        }, 5000);
+                        }, 12000);
                     }
                 } else {
                     agregarMensajeChat("⚠️ " + (data.message || "No pude entender, intente de nuevo."), false);
