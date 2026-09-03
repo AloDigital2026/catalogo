@@ -101,6 +101,96 @@
             cursor: pointer;
         }
         #chat-enviar:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* ===== NUEVO: Botón "Ver lista completa" ===== */
+        .btn-lista-completa {
+            display: block;
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto 16px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(48,209,88,0.35);
+            background: #1a1a1a;
+            color: #30D158;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        .btn-lista-completa:hover { background: #30D158; color: #000; }
+
+        /* ===== NUEVO: Panel de lista completa ===== */
+        #panel-lista {
+            max-width: 480px;
+            margin: 0 auto 16px;
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(48,209,88,0.25);
+            border-radius: 10px;
+            padding: 12px;
+        }
+        #panel-lista.oculto { display: none; }
+
+        #buscador-lista {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        #lista-productos {
+            max-height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 4px;
+        }
+
+        .lista-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #1a1a1a;
+            border: 1px solid transparent;
+        }
+        .lista-item.seleccionado { border-color: #30D158; }
+
+        .lista-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .lista-item-nombre {
+            font-size: 13px;
+            color: #eee;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lista-item-precio {
+            font-size: 13px;
+            color: #30D158;
+            font-weight: bold;
+        }
+
+        .lista-item .selector-cantidad {
+            margin-top: 0;
+            flex-shrink: 0;
+        }
+
+        .sin-resultados {
+            color: #888;
+            font-size: 13px;
+            text-align: center;
+            padding: 10px;
+        }
     </style>
 </head>
 <body>
@@ -115,6 +205,17 @@
         Si le escribe, cuéntele de una vez su <strong>pedido, dirección y forma de pago</strong>
         — así le responde más rápido.
     </p>
+
+    <!-- NUEVO: botón para abrir la lista completa -->
+    <button type="button" class="btn-lista-completa" id="btn-toggle-lista">
+        📋 ¿No encuentra lo que busca? Ver lista completa de productos
+    </button>
+
+    <!-- NUEVO: panel de lista completa (oculto por defecto) -->
+    <div id="panel-lista" class="oculto">
+        <input type="text" id="buscador-lista" placeholder="🔎 Buscar producto..." autocomplete="off">
+        <div id="lista-productos"></div>
+    </div>
 
     <main class="catalogo" id="grid"></main>
 
@@ -152,6 +253,10 @@
         let totalAcumulado = 0;
         let cantidades = {};
 
+        // NUEVO: guardamos aquí el catálogo completo que ya trae el backend,
+        // para poder mostrarlo en la lista sin pedirlo de nuevo.
+        let catalogoCompleto = [];
+
         function recalcularTotal() {
             totalAcumulado = 0;
             Object.values(cantidades).forEach(item => {
@@ -160,12 +265,16 @@
             totalTXT.innerText = `COP $${totalAcumulado.toLocaleString('es-CO')}`;
         }
 
+        // MODIFICADO: ahora actualiza TODAS las tarjetas del mismo producto
+        // (la de fotos y la de la lista completa, si existen las dos)
+        // usando data-id en vez de un único id fijo por producto.
         function actualizarTarjeta(prod) {
             const cantidadActual = cantidades[prod.id] ? cantidades[prod.id].cantidad : 0;
-            const numeroEl = document.getElementById(`cantidad-${prod.id}`);
-            const cardEl = document.getElementById(`card-${prod.id}`);
-            if (numeroEl) numeroEl.innerText = cantidadActual;
-            if (cardEl) cardEl.classList.toggle('seleccionado', cantidadActual > 0);
+            document.querySelectorAll(`[data-id="${prod.id}"]`).forEach(el => {
+                const numeroEl = el.querySelector('.cantidad-numero');
+                if (numeroEl) numeroEl.innerText = cantidadActual;
+                el.classList.toggle('seleccionado', cantidadActual > 0);
+            });
         }
 
         function cambiarCantidad(prod, delta) {
@@ -182,12 +291,15 @@
             recalcularTotal();
         }
 
+        // MODIFICADO: se agrega data-id="${prod.id}" a la tarjeta,
+        // necesario para que actualizarTarjeta() la encuentre.
         function mostrarProductos(lista) {
             grid.innerHTML = '';
             lista.forEach(prod => {
                 const card = document.createElement('div');
                 card.className = 'producto';
                 card.id = `card-${prod.id}`;
+                card.dataset.id = prod.id;
 
                 card.innerHTML = `
                     <div class="indicador"></div>
@@ -209,6 +321,69 @@
                 grid.appendChild(card);
             });
         }
+
+        // ===== NUEVO: LISTA COMPLETA DE PRODUCTOS =====
+        const btnToggleLista = document.getElementById('btn-toggle-lista');
+        const panelLista = document.getElementById('panel-lista');
+        const buscadorLista = document.getElementById('buscador-lista');
+        const listaProductosEl = document.getElementById('lista-productos');
+
+        function renderizarListaCompleta(lista) {
+            listaProductosEl.innerHTML = '';
+
+            if (lista.length === 0) {
+                listaProductosEl.innerHTML = '<div class="sin-resultados">No se encontró ningún producto con ese nombre.</div>';
+                return;
+            }
+
+            lista.forEach(prod => {
+                const cantidadActual = cantidades[prod.id] ? cantidades[prod.id].cantidad : 0;
+
+                const item = document.createElement('div');
+                item.className = 'lista-item';
+                item.dataset.id = prod.id;
+                if (cantidadActual > 0) item.classList.add('seleccionado');
+
+                item.innerHTML = `
+                    <div class="lista-item-info">
+                        <div class="lista-item-nombre">${prod.nombre}</div>
+                        <div class="lista-item-precio">COP $${prod.precio.toLocaleString('es-CO')}</div>
+                    </div>
+                    <div class="selector-cantidad">
+                        <button class="btn-cantidad" data-accion="menos">−</button>
+                        <span class="cantidad-numero">${cantidadActual}</span>
+                        <button class="btn-cantidad" data-accion="mas">+</button>
+                    </div>
+                `;
+
+                item.querySelector('[data-accion="menos"]').onclick = () => cambiarCantidad(prod, -1);
+                item.querySelector('[data-accion="mas"]').onclick = () => cambiarCantidad(prod, 1);
+
+                listaProductosEl.appendChild(item);
+            });
+        }
+
+        function filtrarYRenderizarLista() {
+            const termino = buscadorLista.value.trim().toLowerCase();
+            const filtrados = termino
+                ? catalogoCompleto.filter(p => p.nombre.toLowerCase().includes(termino))
+                : catalogoCompleto;
+            renderizarListaCompleta(filtrados);
+        }
+
+        btnToggleLista.addEventListener('click', () => {
+            const seAbre = panelLista.classList.contains('oculto');
+            panelLista.classList.toggle('oculto');
+            btnToggleLista.innerText = seAbre
+                ? '📋 Ocultar lista de productos'
+                : '📋 ¿No encuentra lo que busca? Ver lista completa de productos';
+            if (seAbre) {
+                filtrarYRenderizarLista();
+                ajustarEspacioParaFooter();
+            }
+        });
+
+        buscadorLista.addEventListener('input', filtrarYRenderizarLista);
 
         // Las fotos (productos.json) son fijas — se suben a mano cuando hay foto real.
         // El nombre, precio y disponibilidad vienen en vivo de la hoja, igual que Arturo.
@@ -234,6 +409,10 @@
                             .filter(p => p && p.disponible); // oculta lo que el tendero marcó agotado
 
                         mostrarProductos(combinados);
+
+                        // NUEVO: guardamos el catálogo COMPLETO (todo lo disponible en la hoja,
+                        // tenga foto o no) para alimentar la lista desplegable.
+                        catalogoCompleto = data.productos.filter(p => p.disponible);
                     })
                     .catch(() => mostrarProductos(fotos)); // si falla el backend, muestra las fotos con sus precios fijos
             })
@@ -376,7 +555,7 @@
                     alert(`¡Pedido #${data.id} registrado correctamente!\nTotal: $${totalAcumulado.toLocaleString('es-CO')} COP.`);
                     cantidades = {};
                     recalcularTotal();
-                    document.querySelectorAll('.producto').forEach(card => {
+                    document.querySelectorAll('.producto, .lista-item').forEach(card => {
                         card.classList.remove('seleccionado');
                         const numeroEl = card.querySelector('.cantidad-numero');
                         if (numeroEl) numeroEl.innerText = '0';
