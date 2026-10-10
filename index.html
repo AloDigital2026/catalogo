@@ -194,6 +194,7 @@
         let playbackContext = null;
         let colaReproduccion = 0;
         let pedidoYaRegistrado = false;
+        let timeoutConexion = null;
 
         const DURACION_FADE = 0.004; // 4 milisegundos, evita "clics" entre fragmentos
 
@@ -274,10 +275,22 @@
         }
 
         async function iniciarVoz() {
+            // Por seguridad, primero se cierra cualquier resto de una
+            // llamada anterior que no se haya colgado bien.
+            detenerVoz();
+
             btnVoz.disabled = true;
             btnVoz.innerText = '🎤 Conectando...';
             estadoArturo.innerText = 'Conectando con Arturo...';
             pedidoYaRegistrado = false;
+
+            // Si en 15 segundos no se logró conectar, se avisa y se deja
+            // el botón listo para intentar de nuevo, en vez de quedar
+            // pegado en "Conectando..." para siempre.
+            timeoutConexion = setTimeout(() => {
+                estadoArturo.innerText = '⚠️ No se pudo conectar. Revise su internet e intente de nuevo.';
+                detenerVoz();
+            }, 15000);
 
             try {
                 // 1. Pedir el permiso temporal al sitio nuevo de Netlify
@@ -294,6 +307,10 @@
                     config: { responseModalities: [Modality.AUDIO] },
                     callbacks: {
                         onopen: () => {
+                            if (timeoutConexion) {
+                                clearTimeout(timeoutConexion);
+                                timeoutConexion = null;
+                            }
                             estadoArturo.innerText = '🎤 Escuchando... hable con confianza';
                             btnVoz.disabled = false;
                             btnVoz.innerText = '🔴 Terminar';
@@ -352,6 +369,10 @@
                 procesadorAudio.connect(audioContext.destination);
 
             } catch (error) {
+                if (timeoutConexion) {
+                    clearTimeout(timeoutConexion);
+                    timeoutConexion = null;
+                }
                 estadoArturo.innerText = '⚠️ No se pudo activar la voz. Revise el permiso del micrófono e intente de nuevo.';
                 btnVoz.disabled = false;
                 btnVoz.innerText = '🎤 Hablar con Arturo';
@@ -359,12 +380,26 @@
         }
 
         function detenerVoz() {
-            procesadorAudio?.disconnect();
-            audioContext?.close();
-            streamMicrofono?.getTracks().forEach(t => t.stop());
-            sesionVoz?.close?.();
-            playbackContext?.close();
+            if (timeoutConexion) {
+                clearTimeout(timeoutConexion);
+                timeoutConexion = null;
+            }
+            try { procesadorAudio?.disconnect(); } catch (e) {}
+            try { if (audioContext && audioContext.state !== 'closed') audioContext.close(); } catch (e) {}
+            try { streamMicrofono?.getTracks().forEach(t => t.stop()); } catch (e) {}
+            try { sesionVoz?.close?.(); } catch (e) {}
+            try { if (playbackContext && playbackContext.state !== 'closed') playbackContext.close(); } catch (e) {}
+
+            // Se limpian todas las referencias para que la próxima vez que
+            // se toque "Hablar con Arturo" empiece siempre desde cero, sin
+            // arrastrar nada de la llamada anterior.
+            sesionVoz = null;
+            audioContext = null;
+            procesadorAudio = null;
+            streamMicrofono = null;
             playbackContext = null;
+            colaReproduccion = 0;
+
             btnVoz.disabled = false;
             btnVoz.innerText = '🎤 Hablar con Arturo';
         }
