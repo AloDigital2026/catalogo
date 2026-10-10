@@ -195,6 +195,8 @@
         let colaReproduccion = 0;
         let pedidoYaRegistrado = false;
         let timeoutConexion = null;
+        let vozActiva = false;   // true solo mientras hay una llamada abierta con Arturo
+        let idLlamada = 0;       // número de la llamada actual; sirve para ignorar restos de llamadas anteriores
 
         const DURACION_FADE = 0.004; // 4 milisegundos, evita "clics" entre fragmentos
 
@@ -278,6 +280,7 @@
             // Por seguridad, primero se cierra cualquier resto de una
             // llamada anterior que no se haya colgado bien.
             detenerVoz();
+            const miId = ++idLlamada;
 
             btnVoz.disabled = true;
             btnVoz.innerText = '🎤 Conectando...';
@@ -288,6 +291,7 @@
             // el botón listo para intentar de nuevo, en vez de quedar
             // pegado en "Conectando..." para siempre.
             timeoutConexion = setTimeout(() => {
+                if (miId !== idLlamada) return;
                 estadoArturo.innerText = '⚠️ No se pudo conectar. Revise su internet e intente de nuevo.';
                 detenerVoz();
             }, 15000);
@@ -302,11 +306,13 @@
 
                 // 2. Conexión directa navegador → Gemini, usando ese permiso
                 const ai = new GoogleGenAI({ apiKey: datosToken.token });
-                sesionVoz = await ai.live.connect({
+                const sesionNueva = await ai.live.connect({
                     model: MODELO_VOZ,
                     config: { responseModalities: [Modality.AUDIO] },
                     callbacks: {
                         onopen: () => {
+                            if (miId !== idLlamada) return;
+                            vozActiva = true;
                             if (timeoutConexion) {
                                 clearTimeout(timeoutConexion);
                                 timeoutConexion = null;
@@ -316,6 +322,7 @@
                             btnVoz.innerText = '🔴 Terminar';
                         },
                         onmessage: async (mensaje) => {
+                            if (miId !== idLlamada) return;
                             const partes = mensaje?.serverContent?.modelTurn?.parts || [];
                             for (const parte of partes) {
                                 if (parte.inlineData?.data) {
@@ -336,10 +343,13 @@
                             }
                         },
                         onerror: () => {
+                            if (miId !== idLlamada) return;
                             estadoArturo.innerText = '⚠️ Se perdió la conexión con Arturo. Intente de nuevo.';
                             detenerVoz();
                         },
                         onclose: () => {
+                            if (miId !== idLlamada) return;
+                            vozActiva = false;
                             if (!pedidoYaRegistrado) {
                                 estadoArturo.innerText = '';
                             }
@@ -349,8 +359,18 @@
                     },
                 });
 
+                if (miId !== idLlamada) {
+                    try { sesionNueva.close(); } catch (e) {}
+                    return;
+                }
+                sesionVoz = sesionNueva;
+
                 // 3. Micrófono: pide permiso y empieza a mandar audio en vivo
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (miId !== idLlamada) {
+                    stream.getTracks().forEach(t => t.stop());
+                    return;
+                }
                 streamMicrofono = stream;
 
                 audioContext = new AudioContext({ sampleRate: 16000 });
@@ -369,6 +389,7 @@
                 procesadorAudio.connect(audioContext.destination);
 
             } catch (error) {
+                if (miId !== idLlamada) return;
                 if (timeoutConexion) {
                     clearTimeout(timeoutConexion);
                     timeoutConexion = null;
@@ -380,6 +401,8 @@
         }
 
         function detenerVoz() {
+            vozActiva = false;
+            idLlamada++;   // cualquier aviso tardío de la llamada anterior se ignora
             if (timeoutConexion) {
                 clearTimeout(timeoutConexion);
                 timeoutConexion = null;
@@ -405,7 +428,7 @@
         }
 
         btnVoz.onclick = function() {
-            if (btnVoz.innerText.includes('Terminar')) {
+            if (vozActiva) {
                 detenerVoz();
             } else {
                 iniciarVoz();
