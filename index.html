@@ -36,6 +36,66 @@
             font-weight: bold;
         }
         .producto.seleccionado { border-color: #4ade80; }
+
+        /* NUEVO: espacio extra abajo para que el pie (ahora con la caja de texto) no tape los productos */
+        body { padding-bottom: 360px; }
+
+        /* ===== Chat de texto con Arturo (recuperado de la versión anterior) ===== */
+        #chat-arturo {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto 12px;
+            background: rgba(0,0,0,0.35);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        #chat-historial {
+            max-height: 160px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px;
+            padding-right: 4px;
+        }
+        .msg-chat {
+            font-size: 13px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            max-width: 85%;
+            line-height: 1.3;
+        }
+        .msg-cliente {
+            align-self: flex-end;
+            background: #2563eb;
+            color: white;
+        }
+        .msg-arturo {
+            align-self: flex-start;
+            background: #333;
+            color: #eee;
+        }
+        #chat-form {
+            display: flex;
+            gap: 6px;
+        }
+        #chat-input {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+        }
+        #chat-enviar {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            background: #4ade80;
+            color: #14181C;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #chat-enviar:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -48,6 +108,15 @@
 
     <footer class="footer">
         <div class="footer-content" style="flex-direction: column; gap: 8px;">
+
+            <!-- Caja de texto con Arturo (recuperada) -->
+            <div id="chat-arturo">
+                <div id="chat-historial"></div>
+                <form id="chat-form">
+                    <input type="text" id="chat-input" placeholder="Escríbale a Arturo su pedido..." autocomplete="off">
+                    <button type="submit" id="chat-enviar">Enviar</button>
+                </form>
+            </div>
 
             <p id="estado-arturo" style="
                 width: 100%;
@@ -173,6 +242,65 @@
                 ];
                 mostrarProductos(respaldoFijo);
             });
+
+        // ===================================================================
+        // CHAT DE TEXTO CON ARTURO (recuperado de la versión anterior, sin cambios)
+        // ===================================================================
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatEnviar = document.getElementById('chat-enviar');
+        const chatHistorial = document.getElementById('chat-historial');
+
+        let conversacionArturo = [];
+
+        function agregarMensajeChat(texto, esCliente) {
+            const div = document.createElement('div');
+            div.className = 'msg-chat ' + (esCliente ? 'msg-cliente' : 'msg-arturo');
+            div.innerText = texto;
+            chatHistorial.appendChild(div);
+            chatHistorial.scrollTop = chatHistorial.scrollHeight;
+        }
+
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const texto = chatInput.value.trim();
+            if (!texto) return;
+
+            agregarMensajeChat(texto, true);
+            chatInput.value = '';
+            chatInput.disabled = true;
+            chatEnviar.disabled = true;
+
+            const params = new URLSearchParams({
+                accion: 'hablarConArturo',
+                texto: texto,
+                historial: JSON.stringify(conversacionArturo)
+            });
+
+            fetch(URL_BACKEND + '?' + params.toString())
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    conversacionArturo = data.historial;
+                    agregarMensajeChat(data.respuesta, false);
+
+                    if (data.terminado) {
+                        agregarMensajeChat(`✅ Pedido #${data.pedido_id} confirmado.`, false);
+                        conversacionArturo = [];
+                    }
+                } else {
+                    agregarMensajeChat("⚠️ " + (data.message || "No pude entender, intente de nuevo."), false);
+                }
+            })
+            .catch(error => {
+                agregarMensajeChat("❌ No se pudo conectar. Intente de nuevo.", false);
+            })
+            .finally(() => {
+                chatInput.disabled = false;
+                chatEnviar.disabled = false;
+                chatInput.focus();
+            });
+        });
 
         // ===================================================================
         // VOZ EN TIEMPO REAL DE DON ARTURO
@@ -440,7 +568,7 @@
             const itemsSeleccionados = Object.values(cantidades);
 
             if (itemsSeleccionados.length === 0) {
-                alert("Use los botones + y − para elegir productos, o hable con Arturo por voz.\n\nSi ya habló con Arturo y confirmó su pedido, no necesita presionar este botón — ya quedó registrado.");
+                alert("Use los botones + y − para elegir productos, o hable con Arturo por voz o por el chat.\n\nSi ya habló con Arturo y confirmó su pedido, no necesita presionar este botón — ya quedó registrado.");
                 return;
             }
 
@@ -461,6 +589,13 @@
                 .map(item => `${item.producto.nombre} x${item.cantidad}`)
                 .join(", ");
 
+            // Recuperado de la versión anterior: detalle por producto para la hoja Detalle
+            const itemsParaDetalle = itemsSeleccionados.map(item => ({
+                producto: item.producto.nombre,
+                cantidad: item.cantidad,
+                precio_unitario: item.producto.precio
+            }));
+
             const params = new URLSearchParams({
                 accion: 'crearPedido',
                 fecha: new Date().toLocaleString(),
@@ -470,7 +605,8 @@
                 origen: 'Web Catálogo',
                 pago: formaPago,
                 notas: observaciones,
-                estado: 'Recibido'
+                estado: 'Recibido',
+                items: JSON.stringify(itemsParaDetalle)
             });
 
             btnFinalizar.disabled = true;
