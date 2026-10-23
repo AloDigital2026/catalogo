@@ -252,6 +252,16 @@
         const chatHistorial = document.getElementById('chat-historial');
 
         let conversacionArturo = [];
+        let temporizadorLimpieza = null;
+
+        // Deja la caja limpia para el siguiente pedido
+        function limpiarChat() {
+            if (temporizadorLimpieza) {
+                clearTimeout(temporizadorLimpieza);
+                temporizadorLimpieza = null;
+            }
+            chatHistorial.innerHTML = '';
+        }
 
         function agregarMensajeChat(texto, esCliente) {
             const div = document.createElement('div');
@@ -265,6 +275,9 @@
             e.preventDefault();
             const texto = chatInput.value.trim();
             if (!texto) return;
+
+            // Si el pedido anterior ya terminó, empezar con la caja limpia
+            if (temporizadorLimpieza) limpiarChat();
 
             agregarMensajeChat(texto, true);
             chatInput.value = '';
@@ -287,6 +300,8 @@
                     if (data.terminado) {
                         agregarMensajeChat(`✅ Pedido #${data.pedido_id} confirmado.`, false);
                         conversacionArturo = [];
+                        // Se deja ver la confirmación 8 segundos y luego se limpia la caja
+                        temporizadorLimpieza = setTimeout(limpiarChat, 8000);
                     }
                 } else {
                     agregarMensajeChat("⚠️ " + (data.message || "No pude entender, intente de nuevo."), false);
